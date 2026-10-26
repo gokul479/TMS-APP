@@ -4,10 +4,40 @@ import { AuthContext } from '../context/AuthContext';
 import { complaintService } from '../services/api';
 import './MasterScreen.css';
 
+const getRoleDetails = (role, username) => {
+  const r = (role || '').toLowerCase().trim();
+  if (r.includes('super') || r.includes('admin')) {
+    return { code: 'SA', icon: '👑', label: 'SuperAdmin', color: '#c084fc', bg: '#7c3aed' };
+  }
+  if (r.includes('plumb')) {
+    return { code: 'PL', icon: '🔧', label: 'Plumber', color: '#38bdf8', bg: '#0284c7' };
+  }
+  if (r.includes('elect')) {
+    return { code: 'EL', icon: '⚡', label: 'Electrician', color: '#facc15', bg: '#d97706' };
+  }
+  if (r.includes('network')) {
+    return { code: 'NS', icon: '🌐', label: 'Network Staff', color: '#a5b4fc', bg: '#4f46e5' };
+  }
+  if (r.includes('hardware')) {
+    return { code: 'HW', icon: '💻', label: 'PC Hardware', color: '#5eead4', bg: '#0d9488' };
+  }
+  if (r.includes('software') || r.includes('dev')) {
+    return { code: 'SD', icon: '👨‍💻', label: 'Software Dev', color: '#d8b4fe', bg: '#9333ea' };
+  }
+  if (r === 'user' || r.includes('student') || r.includes('faculty')) {
+    return { code: 'US', icon: '👤', label: 'User', color: '#38bdf8', bg: '#0ea5e9' };
+  }
+  const words = (role || 'User').split(' ');
+  const code = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : (role || 'US').substring(0, 2).toUpperCase();
+  return { code, icon: '🛡️', label: role || 'Member', color: '#94a3b8', bg: '#334155' };
+};
+
 const HomePage = () => {
-  const { user, isAuthenticated } = useContext(AuthContext);
+  const { user, isAuthenticated, logout } = useContext(AuthContext);
   const [stats, setStats] = useState(null);
   const [recentComplaints, setRecentComplaints] = useState([]);
+  const [showProfile, setShowProfile] = useState(false);
+  const roleDetails = getRoleDetails(user?.role, user?.username);
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'SuperAdmin') {
@@ -78,13 +108,43 @@ const HomePage = () => {
               </div>
             </div>
             <div className="welcome-right">
-              <div className="avatar-container">
-                <div className="user-avatar">{user?.username?.charAt(0).toUpperCase() || 'U'}</div>
+              <div 
+                className="avatar-container" 
+                onClick={() => setShowProfile(true)}
+                style={{ cursor: 'pointer', position: 'relative' }}
+                title="Click to view profile details"
+              >
+                <div className="user-avatar" style={{ background: roleDetails.bg, color: '#ffffff', fontWeight: '800' }}>
+                  {roleDetails.code}
+                </div>
+                <div className="avatar-emblem-badge" title={roleDetails.label}>
+                  {roleDetails.icon}
+                </div>
                 <div className="avatar-ring"></div>
               </div>
               <div className="user-info">
-                <span className="user-role">{user?.role || 'Guest'}</span>
-                <span className="user-status">● Online</span>
+                <span className="user-role" style={{ color: roleDetails.color, fontWeight: '700' }}>
+                  {roleDetails.icon} {user?.role || roleDetails.label}
+                </span>
+                {isAuthenticated && (
+                  <button 
+                    onClick={() => setShowProfile(true)} 
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.4)',
+                      color: '#38bdf8',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      marginTop: '4px',
+                      display: 'inline-block'
+                    }}
+                  >
+                    👤 View Profile
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -95,7 +155,7 @@ const HomePage = () => {
           <div className="stats-section">
             <h2 className="section-title">Overview</h2>
             <div className="stats-grid">
-              <div className="stat-card total">
+              <Link to="/complaints" className="stat-card total" style={{ textDecoration: 'none', cursor: 'pointer' }}>
                 <div className="stat-icon">📋</div>
                 <div className="stat-info">
                   <span className="stat-num">{stats.total || 0}</span>
@@ -104,8 +164,8 @@ const HomePage = () => {
                 <div className="stat-bar">
                   <div className="stat-progress" style={{ width: '100%' }}></div>
                 </div>
-              </div>
-              <div className="stat-card pending">
+              </Link>
+              <Link to="/complaints?status=Pending" className="stat-card pending" style={{ textDecoration: 'none', cursor: 'pointer' }}>
                 <div className="stat-icon">⏳</div>
                 <div className="stat-info">
                   <span className="stat-num">{stats.pending || 0}</span>
@@ -114,8 +174,8 @@ const HomePage = () => {
                 <div className="stat-bar">
                   <div className="stat-progress" style={{ width: `${stats.total ? (stats.pending / stats.total * 100) : 0}%` }}></div>
                 </div>
-              </div>
-              <div className="stat-card resolved">
+              </Link>
+              <Link to="/complaints?status=Closed" className="stat-card resolved" style={{ textDecoration: 'none', cursor: 'pointer' }}>
                 <div className="stat-icon">✅</div>
                 <div className="stat-info">
                   <span className="stat-num">{stats.resolved || 0}</span>
@@ -124,17 +184,17 @@ const HomePage = () => {
                 <div className="stat-bar">
                   <div className="stat-progress" style={{ width: `${stats.total ? (stats.resolved / stats.total * 100) : 0}%` }}></div>
                 </div>
-              </div>
-              <div className="stat-card rejected">
+              </Link>
+              <Link to="/complaints?status=Closed" className="stat-card rejected" style={{ textDecoration: 'none', cursor: 'pointer' }}>
                 <div className="stat-icon">❌</div>
                 <div className="stat-info">
                   <span className="stat-num">{stats.rejected || 0}</span>
-                  <span className="stat-text">Rejected</span>
+                  <span className="stat-text">Rejected / Closed</span>
                 </div>
                 <div className="stat-bar">
                   <div className="stat-progress" style={{ width: `${stats.total ? (stats.rejected / stats.total * 100) : 0}%` }}></div>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
         )}
@@ -169,6 +229,27 @@ const HomePage = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Actions for SuperAdmin */}
+        {isAuthenticated && user?.role === 'SuperAdmin' && (
+          <div className="user-section">
+            <h2 className="section-title">Admin Quick Actions</h2>
+            <div className="quick-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+              <Link to="/complaints" className="action-btn primary" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' }}>
+                <span className="action-icon">📋</span>
+                <span>View All Tickets</span>
+              </Link>
+              <Link to="/departments" className="action-btn secondary" style={{ borderColor: '#f59e0b' }}>
+                <span className="action-icon">⚙️</span>
+                <span>Admin Master</span>
+              </Link>
+              <Link to="/reports" className="action-btn secondary" style={{ borderColor: '#10b981' }}>
+                <span className="action-icon">📈</span>
+                <span>Analytics & Reports</span>
+              </Link>
             </div>
           </div>
         )}
@@ -282,6 +363,39 @@ const HomePage = () => {
           font-weight: 700;
           position: relative;
           z-index: 1;
+        }
+
+        .avatar-emblem-badge {
+          position: absolute;
+          bottom: -4px;
+          right: -4px;
+          background: #090d16;
+          border: 2px solid #24344d;
+          border-radius: 50%;
+          width: 26px;
+          height: 26px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          z-index: 3;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+        }
+
+        .profile-modal-avatar-badge {
+          position: absolute;
+          bottom: 0px;
+          right: -4px;
+          background: #090d16;
+          border: 2px solid #24344d;
+          border-radius: 50%;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.6);
         }
 
         .avatar-ring {
@@ -561,9 +675,73 @@ const HomePage = () => {
         @media (max-width: 480px) {
           .stats-grid {
             grid-template-columns: 1fr;
-          }
-        }
       `}</style>
+
+      {/* Profile Details Modal in HomePage */}
+      {showProfile && (
+        <div className="profile-modal-backdrop" onClick={() => setShowProfile(false)}>
+          <div className="profile-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="profile-modal-header">
+              <div className="profile-modal-title">
+                <span className="profile-modal-icon">👤</span>
+                <h3>User Profile Details</h3>
+              </div>
+              <button 
+                className="profile-modal-close" 
+                onClick={() => setShowProfile(false)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="profile-modal-hero">
+              <div className="profile-modal-avatar-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+                <div className="profile-modal-avatar" style={{ background: roleDetails.bg, color: '#ffffff', fontWeight: '800' }}>
+                  {roleDetails.code}
+                </div>
+                <span className="profile-modal-avatar-badge" title={roleDetails.label}>
+                  {roleDetails.icon}
+                </span>
+              </div>
+              <h2 className="profile-modal-username">{user?.username || 'User'}</h2>
+              <span className="profile-modal-role-badge" style={{ background: roleDetails.bg + '25', borderColor: roleDetails.bg, color: roleDetails.color }}>
+                {roleDetails.icon} {user?.role || roleDetails.label}
+              </span>
+            </div>
+
+            <div className="profile-modal-table">
+              <div className="profile-table-row">
+                <span className="table-label">📧 Email Address</span>
+                <span className="table-value">{user?.email || 'N/A'}</span>
+              </div>
+              <div className="profile-table-row">
+                <span className="table-label">📱 Phone Number</span>
+                <span className="table-value">{user?.phone || 'N/A'}</span>
+              </div>
+              <div className="profile-table-row">
+                <span className="table-label">🏢 Department</span>
+                <span className="table-value">
+                  {typeof user?.department === 'object' ? (user?.department?.name || 'Admin Dept') : (user?.department || 'General')}
+                </span>
+              </div>
+              <div className="profile-table-row">
+                <span className="table-label">🟢 Account Status</span>
+                <span className="table-value status-active">● Active</span>
+              </div>
+            </div>
+
+            <div className="profile-modal-actions">
+              <button className="profile-modal-exit-btn" onClick={logout}>
+                🚪 Exit / Sign Out
+              </button>
+              <button className="profile-modal-dismiss-btn" onClick={() => setShowProfile(false)}>
+                ✕ Close Window
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

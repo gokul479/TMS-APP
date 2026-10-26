@@ -4,19 +4,24 @@ const path = require('path');
 
 exports.createComplaint = async (req, res) => {
   try {
-    const { blockName, roomNumber, complaintType, remarks, userId } = req.body;
+    const { blockName, roomNumber, complaintType, remarks, userId, departmentName, programmeName } = req.body;
 
     if (!blockName || !roomNumber || !complaintType) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Only SuperAdmin and regular Users can create complaints
+    // SuperAdmin cannot create complaints; only regular Users can
     const requester = req.user || {};
-    if (requester.role && !['SuperAdmin', 'User'].includes(requester.role)) {
+    if (requester.role === 'SuperAdmin') {
+      return res.status(403).json({ message: 'Super Admin cannot raise complaints' });
+    }
+    if (requester.role && requester.role !== 'User') {
       return res.status(403).json({ message: 'You do not have permission to create complaints' });
     }
 
     const complaint = new Complaint({
+      departmentName,
+      programmeName,
       blockName,
       roomNumber,
       complaintType,
@@ -41,21 +46,22 @@ exports.getStats = async (req, res) => {
     const requester = req.user;
     if (!requester) return res.status(401).json({ message: 'Unauthorized' });
 
+    const STAFF_ROLES = ['Plumber', 'Electrician', 'Networking Staff', 'Software Developer', 'PC Hardware'];
+
     // SuperAdmin: global stats
     if (requester.role === 'SuperAdmin') {
       const all = await Complaint.find();
       const total = all.length;
       const pending = all.filter((c) => c.status === 'Pending').length;
       const assigned = all.filter((c) => c.status === 'Assigned').length;
-      const closed = all.filter((c) => c.status === 'Closed').length;
+      const closed = all.filter((c) => c.status === 'Closed' || c.status === 'Resolved').length;
       return res.json({ total, pending, assigned, closed });
     }
 
     // Staff/Technician: stats for complaints assigned to them or their department
-    if (!['SuperAdmin', 'User'].includes(requester.role)) {
+    if (STAFF_ROLES.includes(requester.role)) {
       let filter = { assignedTo: requester.id };
       
-      // If staff has a department assigned, also get complaints for all staff in that dept
       if (requester.department) {
         const sameDeptStaff = await User.find({ department: requester.department }).select('_id');
         const staffIds = sameDeptStaff.map(u => u._id);
@@ -65,25 +71,22 @@ exports.getStats = async (req, res) => {
             { createdBy: requester.id }
           ]
         };
-      } else {
-        // Fallback: if no department, just show assigned to this user
-        filter = { assignedTo: requester.id };
       }
       
       const assignedList = await Complaint.find(filter);
       const total = assignedList.length;
       const pending = assignedList.filter((c) => c.status === 'Pending').length;
       const assigned = assignedList.filter((c) => c.status === 'Assigned').length;
-      const closed = assignedList.filter((c) => c.status === 'Closed').length;
+      const closed = assignedList.filter((c) => c.status === 'Closed' || c.status === 'Resolved').length;
       return res.json({ total, pending, assigned, closed });
     }
 
-    // Regular User: stats for complaints created by them
+    // Regular User: stats for complaints strictly created by them
     const myList = await Complaint.find({ createdBy: requester.id });
     const total = myList.length;
     const pending = myList.filter((c) => c.status === 'Pending').length;
     const assigned = myList.filter((c) => c.status === 'Assigned').length;
-    const closed = myList.filter((c) => c.status === 'Closed').length;
+    const closed = myList.filter((c) => c.status === 'Closed' || c.status === 'Resolved').length;
     res.json({ total, pending, assigned, closed });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch stats', error: error.message });
@@ -95,24 +98,44 @@ exports.listComplaints = async (req, res) => {
     const requester = req.user;
     if (!requester) return res.status(401).json({ message: 'Unauthorized' });
 
+    const STAFF_ROLES = ['Plumber', 'Electrician', 'Networking Staff', 'Software Developer', 'PC Hardware'];
+
+    const { status, limit } = req.query;
+    let statusFilterObj = {};
+    if (status && status !== 'All') {
+      if (status === 'In-Progress' || status === 'In Progress') {
+        statusFilterObj = { status: { $in: ['In-Progress', 'In Progress'] } };
+      } else if (status === 'Closed' || status === 'Resolved') {
+        statusFilterObj = { status: { $in: ['Closed', 'Resolved'] } };
+      } else {
+        statusFilterObj = { status: new RegExp(`^${status}$`, 'i') };
+      }
+    }
+
     // SuperAdmin: all complaints
     if (requester.role === 'SuperAdmin') {
-      const complaints = await Complaint.find()
+      let query = Complaint.find(statusFilterObj)
         .populate({ path: 'createdBy', select: 'username email department', populate: { path: 'department', select: 'name' } })
         .populate({ path: 'assignedTo', select: 'username email role department', populate: { path: 'department', select: 'name' } })
         .sort({ createdAt: -1 });
+
+      if (limit) {
+        query = query.limit(parseInt(limit, 10));
+      }
+
+      const complaints = await query;
       return res.json(complaints);
     }
 
     // Staff/Technician: complaints assigned to them or their department
-    if (!['SuperAdmin', 'User'].includes(requester.role)) {
-      let filter = { assignedTo: requester.id };
+    if (STAFF_ROLES.includes(requester.role)) {
+      let filter = { ...statusFilterObj, assignedTo: requester.id };
       
-      // If staff has a department assigned, also get complaints for all staff in that dept
       if (requester.department) {
         const sameDeptStaff = await User.find({ department: requester.department }).select('_id');
         const staffIds = sameDeptStaff.map(u => u._id);
         filter = {
+          ...statusFilterObj,
           $or: [
             { assignedTo: { $in: staffIds } },
             { createdBy: requester.id }
@@ -120,18 +143,31 @@ exports.listComplaints = async (req, res) => {
         };
       }
 
-      const complaints = await Complaint.find(filter)
+      let query = Complaint.find(filter)
         .populate({ path: 'createdBy', select: 'username email department', populate: { path: 'department', select: 'name' } })
         .populate({ path: 'assignedTo', select: 'username email role department', populate: { path: 'department', select: 'name' } })
         .sort({ createdAt: -1 });
+
+      if (limit) {
+        query = query.limit(parseInt(limit, 10));
+      }
+
+      const complaints = await query;
       return res.json(complaints);
     }
 
-    // Regular User: complaints raised by them
-    const complaints = await Complaint.find({ createdBy: requester.id })
+    // Regular User: strictly complaints raised by them
+    let filter = { ...statusFilterObj, createdBy: requester.id };
+    let query = Complaint.find(filter)
       .populate({ path: 'createdBy', select: 'username email department', populate: { path: 'department', select: 'name' } })
       .populate({ path: 'assignedTo', select: 'username email role department', populate: { path: 'department', select: 'name' } })
       .sort({ createdAt: -1 });
+
+    if (limit) {
+      query = query.limit(parseInt(limit, 10));
+    }
+
+    const complaints = await query;
     res.json(complaints);
   } catch (error) {
     res.status(500).json({ message: 'Failed to list complaints', error: error.message });

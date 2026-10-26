@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
+import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { userService, departmentService, programmeService } from '../services/api';
+import { userService, departmentService, programmeService, roleService } from '../services/api';
 import './MasterScreen.css';
 
 const UserPage = () => {
@@ -22,25 +23,33 @@ const UserPage = () => {
   });
   const [editingId, setEditingId] = useState(null);
 
-  const roles = ['SuperAdmin', 'User', 'Networking Staff', 'Plumber', 'Electrician', 'Software Developer', 'Application', 'PC Hardware'];
+  const defaultRoles = ['SuperAdmin', 'User', 'Networking Staff', 'Plumber', 'Electrician', 'Software Developer', 'Application', 'PC Hardware'];
+  const [rolesList, setRolesList] = useState(defaultRoles);
 
   useEffect(() => {
     if (user?.role === 'SuperAdmin') {
       fetchData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [userRes, deptRes, progRes] = await Promise.all([
+      const [userRes, deptRes, progRes, roleRes] = await Promise.all([
         userService.getAll(),
         departmentService.getAll(),
-        programmeService.getAll()
+        programmeService.getAll(),
+        roleService.getAll().catch(() => ({ data: [] }))
       ]);
       setUsers(userRes.data);
       setDepartments(deptRes.data);
       setProgrammes(progRes.data);
+
+      if (roleRes?.data && Array.isArray(roleRes.data) && roleRes.data.length > 0) {
+        const dynamicRoleNames = roleRes.data.map((r) => r.name);
+        setRolesList(Array.from(new Set([...defaultRoles, ...dynamicRoleNames])));
+      }
       setError('');
     } catch (err) {
       setError('Failed to fetch data');
@@ -121,11 +130,29 @@ const UserPage = () => {
     <div className="master-screen">
       <div className="screen-header">
         <h1>User Management</h1>
-        {user?.role === 'SuperAdmin' && (
-          <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-            {showForm ? 'Cancel' : 'Add User'}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {user?.role === 'SuperAdmin' && (
+            <Link
+              to="/roles"
+              className="btn-primary"
+              style={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#4f46e5',
+                borderColor: '#6366f1'
+              }}
+            >
+              🛡️ Create Role
+            </Link>
+          )}
+          {user?.role === 'SuperAdmin' && (
+            <button onClick={() => setShowForm(!showForm)} className="btn-primary">
+              {showForm ? '✕ Cancel' : '➕ Add User'}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -169,19 +196,24 @@ const UserPage = () => {
             />
           </div>
           <div className="form-group">
-            <label>Role</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ margin: 0 }}>Role</label>
+              <Link to="/roles" style={{ fontSize: '0.82rem', color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}>
+                ➕ Create New Role
+              </Link>
+            </div>
             <select
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             >
-              {roles.map((r) => (
+              {rolesList.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
           </div>
           {/* Department and Programme fields removed as not required */}
           <button type="submit" className="btn-primary">
-            {editingId ? 'Update' : 'Create'}
+            {editingId ? '💾 Update User' : '➕ Create User'}
           </button>
         </form>
       )}

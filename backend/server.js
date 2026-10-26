@@ -17,7 +17,10 @@ const path = require('path');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(express.json());
 
 // Connect to MongoDB

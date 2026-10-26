@@ -40,7 +40,8 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email }).select('+password').populate('department');
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: { $regex: new RegExp('^' + cleanEmail + '$', 'i') } }).select('+password').populate('department');
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -59,7 +60,19 @@ exports.login = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRY }
     );
 
-    res.json({ message: 'Login successful', token, user: { id: user._id, username: user.username, email: user.email, role: user.role } });
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        department: user.department,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Login failed', error: error.message });
   }

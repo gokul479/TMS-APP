@@ -114,9 +114,9 @@ function App() {
           <Route
             path="/complaints"
             element={
-              <ProtectedRoute>
+              <SuperAdminRoute>
                 <ComplaintsDashboardPage />
-              </ProtectedRoute>
+              </SuperAdminRoute>
             }
           />
           <Route

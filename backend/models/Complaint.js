@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const complaintSchema = new mongoose.Schema(
   {
+    departmentName: { type: String },
+    programmeName: { type: String },
     blockName: { type: String, required: true },
     roomNumber: { type: String, required: true },
     complaintType: { type: String, required: true },

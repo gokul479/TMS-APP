@@ -84,7 +84,7 @@ const RolePage = () => {
         <h1>Role Management</h1>
         {user?.role === 'SuperAdmin' && (
           <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-            {showForm ? 'Cancel' : 'Add Role'}
+            {showForm ? '✕ Cancel' : '➕ Create Role'}
           </button>
         )}
       </div>
@@ -94,13 +94,13 @@ const RolePage = () => {
       {showForm && user?.role === 'SuperAdmin' && (
         <form onSubmit={handleSubmit} className="master-form">
           <div className="form-group">
-            <label>Role Name</label>
+            <label>Role Name *</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
-              placeholder="e.g., Electrician"
+              placeholder="e.g., Electrician, IT Support"
             />
           </div>
           <div className="form-group">
@@ -109,6 +109,7 @@ const RolePage = () => {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows="3"
+              placeholder="Brief description of responsibilities"
             ></textarea>
           </div>
           <div className="form-group">
@@ -121,7 +122,7 @@ const RolePage = () => {
             ></textarea>
           </div>
           <button type="submit" className="btn-primary">
-            {editingId ? 'Update' : 'Create'}
+            {editingId ? '💾 Update Role' : '➕ Create Role'}
           </button>
         </form>
       )}
